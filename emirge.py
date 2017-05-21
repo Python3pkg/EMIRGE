@@ -58,7 +58,7 @@ from subprocess import Popen, PIPE, check_call
 from time import ctime, time
 from datetime import timedelta
 import gzip
-import cPickle
+import pickle
 import _emirge
 
 BOWTIE_l = 20
@@ -110,7 +110,7 @@ class EM(object):
     """
     _VERBOSE = True
     base2i = {"A":0,"T":1,"C":2,"G":3}
-    i2base = dict([(v,k) for k,v in base2i.iteritems()])
+    i2base = dict([(v,k) for k,v in base2i.items()])
     # asciibase2i = {65:0,84:1,67:2,71:3}
 
     DEFAULT_ERROR = 0.05
@@ -237,7 +237,7 @@ class EM(object):
             read_i = 0
         else:
             seq_i = max(self.sequence_i2sequence_name[-2].keys()) + 1   
-            read_i = max([-1] + self.read_i2read_name[-2].keys()) + 1           # [-1] added for resume case
+            read_i = max([-1] + list(self.read_i2read_name[-2].keys())) + 1           # [-1] added for resume case
 
         # reset this every iteration
         self.coverage = [0]*seq_i
@@ -366,11 +366,11 @@ class EM(object):
         resume_iterdir = os.path.join(self.cwd, "%s%02d"%(self.iterdir_prefix, self.resume_i))
         previous_iterdir = os.path.join(self.cwd, "%s%02d"%(self.iterdir_prefix, self.resume_i - 1))
         if not os.path.exists(resume_iterdir):
-            raise OSError, "\n\nERROR: Cannot resume from non-existent directory %s"%(resume_iterdir)
+            raise OSError("\n\nERROR: Cannot resume from non-existent directory %s"%(resume_iterdir))
         if not os.path.exists(previous_iterdir):
-            raise OSError, "\n\nERROR: Resume requires the previous iteration directory (%02d) also be present."%(resume_iterdir - 1)
+            raise OSError("\n\nERROR: Resume requires the previous iteration directory (%02d) also be present."%(resume_iterdir - 1))
         if not os.path.exists(os.path.join(resume_iterdir, "bowtie.iter.%02d.log.gz"%(self.resume_i))):
-            raise OSError, "\n\nERROR: directory %s appears to be an incomplete iteration (no bowtie log file).  You must resume from a *completed* iteration (perhaps try iteration %02d)."%(resume_iterdir, self.resume_i-1)
+            raise OSError("\n\nERROR: directory %s appears to be an incomplete iteration (no bowtie log file).  You must resume from a *completed* iteration (perhaps try iteration %02d)."%(resume_iterdir, self.resume_i-1))
         if self._VERBOSE:
             sys.stderr.write("Resuming EMIRGE from iteration %02d at %s ...\nStarting from information in directory:\n%s\n"%(self.resume_i,
                                                                                                                              ctime(),
@@ -422,7 +422,7 @@ class EM(object):
         if filename is None:
             filename = os.path.join(self.iterdir, 'em.%02i.data.pkl'%self.iteration_i)
         try:
-            cPickle.dump(tup_to_save, file(filename, 'w'), cPickle.HIGHEST_PROTOCOL)
+            pickle.dump(tup_to_save, file(filename, 'w'), pickle.HIGHEST_PROTOCOL)
         except SystemError:  # cPickle problem with numpy arrays in latest emacs???
             sys.stderr.write("oops!  cPickle error!  Falling back to pickle.\n")
             import pickle
@@ -446,10 +446,10 @@ class EM(object):
                 setattr(self, name, None)
         try:
             (self.bamfile_data, self.base2i, self.cluster_thresh, self.coverage, self.current_bam_filename, self.current_reference_fasta_filename, self.cwd, self.i2base, self.insert_mean, self.insert_sd, self.iteration_i, self.iterdir, self.iterdir_prefix, self.k, self.likelihoods, self.mapping_nice, self.max_read_length, self.min_depth, self.min_length_coverage, self.min_prior, self.n_cpus, self.posteriors, self.priors, self.probN, self.quals, self.read_i2read_name, self.read_name2read_i, self.reads1_filepath, self.reads2_filepath, self.sequence_i2sequence_name, self.sequence_name2fasta_name, self.sequence_name2sequence_i, self.snp_minor_prob_thresh, self.snp_percentage_thresh, self.unmapped_bases, self.v) = \
-                                cPickle.load(infile)
+                                pickle.load(infile)
         except ValueError:  # old version didn't have bamfile_data
             (self.base2i, self.cluster_thresh, self.coverage, self.current_bam_filename, self.current_reference_fasta_filename, self.cwd, self.i2base, self.insert_mean, self.insert_sd, self.iteration_i, self.iterdir_prefix, self.k, self.likelihoods, self.mapping_nice, self.max_read_length, self.min_depth, self.min_length_coverage, self.min_prior, self.n_cpus, self.posteriors, self.priors, self.probN, self.quals, self.read_i2read_name, self.read_name2read_i, self.reads1_filepath, self.reads2_filepath, self.sequence_i2sequence_name, self.sequence_name2fasta_name, self.sequence_name2sequence_i, self.snp_minor_prob_thresh, self.snp_percentage_thresh, self.unmapped_bases, self.v) = \
-                                cPickle.load(infile)
+                                pickle.load(infile)
         self.fastafile = pysam.Fastafile(self.current_reference_fasta_filename)
 
         # change self.posteriors to sparse matrix if we are loading old data type
@@ -506,7 +506,7 @@ class EM(object):
         # python gzip.GzipFile is slow.  Use system call instead
         # cPickle.dump(self.probN, gzip.GzipFile(os.path.join(self.iterdir, 'probN.pkl.gz'), 'w'), cPickle.HIGHEST_PROTOCOL)
         pickled_filename = os.path.join(self.iterdir, 'probN.pkl')
-        cPickle.dump(self.probN, file(pickled_filename, 'w'), cPickle.HIGHEST_PROTOCOL)
+        pickle.dump(self.probN, file(pickled_filename, 'w'), pickle.HIGHEST_PROTOCOL)
         check_call("gzip -f %s"%(pickled_filename), shell=True, stdout = sys.stdout, stderr = sys.stderr)
         if self._VERBOSE:
             sys.stderr.write("DONE Writing priors and probN to disk for iteration %d at %s...\n"%(self.iteration_i, ctime()))
@@ -641,7 +641,7 @@ class EM(object):
                 else:
                     title_root = title_root.groups()[0]
                 # now check for any known name with same root and a _m on it.
-                previous_m_max = max([0] + [int(x) for x in re.findall(r'%s_m(\d+)'%re.escape(title_root), " ".join(self.sequence_i2sequence_name[-1].values()))])
+                previous_m_max = max([0] + [int(x) for x in re.findall(r'%s_m(\d+)'%re.escape(title_root), " ".join(list(self.sequence_i2sequence_name[-1].values())))])
                 m_title = "%s_m%02d"%(title_root, previous_m_max+1)
 
                 # also split out Priors and Posteriors (which will be used in next round), split with average ratio of major to minor alleles.
@@ -786,7 +786,7 @@ class EM(object):
                     consensus[unmapped_i] = orig_bases[unmapped_i] # return to original base if unmapped.
                 # consensus[unmapped_indices] = [letter.lower() for letter in consensus[unmapped_indices]]
             else:
-                raise ValueError, "Invalid value for mask: %s (choose one of {soft, hard}"%mask
+                raise ValueError("Invalid value for mask: %s (choose one of {soft, hard}"%mask)
             of.write(">%s\n"%(title))
             of.write("%s\n"%("".join(consensus)))
             n_seqs += 1
@@ -919,8 +919,8 @@ class EM(object):
             if self._VERBOSE and num_seqs < 50:
                 # print >> sys.stderr, row
                 # print >> sys.stderr, "%s %s %s %s  --  %s, %s"%(member_seq_id, member_name, seed_seq_id, seed_name, float(matches), aln_columns)
-                print >> sys.stderr, "\t\t%s|%s vs %s|%s %.3f over %s aligned columns"%(member_seq_id, member_name, seed_seq_id, seed_name,
-                                                                float(matches) / aln_columns, aln_columns)
+                print("\t\t%s|%s vs %s|%s %.3f over %s aligned columns"%(member_seq_id, member_name, seed_seq_id, seed_name,
+                                                                float(matches) / aln_columns, aln_columns), file=sys.stderr)
 
 
             # if above thresh, then first decide which sequence to keep, (one with higher prior probability).
@@ -1232,7 +1232,7 @@ class EM(object):
             pickled_filename = os.path.join(self.iterdir, 'probN.pkl')
             sys.stderr.write("\tLoading probN for resume case from %s\n"%pickled_filename)
             check_call("gzip -d -c %s > %s"%(pickled_filename+'.gz', pickled_filename), shell=True, stdout = sys.stdout, stderr = sys.stderr)
-            self.probN = cPickle.load(open(pickled_filename))     # and need to use already-calculated probN
+            self.probN = pickle.load(open(pickled_filename))     # and need to use already-calculated probN
             os.remove(pickled_filename) # git rid of decompressed file
         else:
             # here do looping in Cython (this loop is about 95% of the time in this method on test data):
@@ -1357,7 +1357,7 @@ class EM(object):
         PREFIX.quals.fasta
 
         """
-        raise NotImplementedError, "Broken with most recent revision of data structures (no more bamfile_readnames)"
+        raise NotImplementedError("Broken with most recent revision of data structures (no more bamfile_readnames)")
         if output_prefix is None:
             output_prefix = os.path.join(em.iterdir, "%s"%seq_i)
 
@@ -1482,7 +1482,7 @@ def do_initial_mapping(working_dir, options):
         option_strings.extend([options.bowtie_db, bampath_prefix])
         cmd = "%s %s | %s bowtie --phred%d-quals -t -p %s -n 3 -l %s -e %s --best --sam --chunkmbs 128  %s - | samtools view -b -S -u -F 0x0004 - > %s.bam "%tuple(option_strings)    
 
-    print "Performing initial mapping with command:\n%s"%cmd
+    print("Performing initial mapping with command:\n%s"%cmd)
     check_call(cmd, shell=True, stdout = sys.stdout, stderr = sys.stderr)
     sys.stdout.flush()
     sys.stderr.flush()
@@ -1502,7 +1502,7 @@ def dependency_check():
     working_minor_minor = 203
     match = re.search(r'usearch([^ ])* v([0-9]*)\.([0-9]*)\.([0-9]*)', Popen("usearch --version", shell=True, stdout=PIPE).stdout.read())
     if match is None:
-        print >> sys.stderr, "FATAL: usearch not found in path!"
+        print("FATAL: usearch not found in path!", file=sys.stderr)
         exit(0)
     binary_name, usearch_major, usearch_minor, usearch_minor_minor = match.groups()
     usearch_major = int(usearch_major)
@@ -1511,7 +1511,7 @@ def dependency_check():
     if usearch_major < working_maj or \
        (usearch_major == working_maj and (usearch_minor < working_minor or \
                                           (usearch_minor == working_minor and usearch_minor_minor < working_minor_minor))):
-        print >> sys.stderr, "FATAL: usearch version found was %s.%s.%s.\nemirge works with version >=  %s.%s.%s\nusearch has different command line arguments and minor bugs in previous versions that can cause problems."%(usearch_major, usearch_minor, usearch_minor_minor, working_maj, working_minor, working_minor_minor)
+        print("FATAL: usearch version found was %s.%s.%s.\nemirge works with version >=  %s.%s.%s\nusearch has different command line arguments and minor bugs in previous versions that can cause problems."%(usearch_major, usearch_minor, usearch_minor_minor, working_maj, working_minor, working_minor_minor), file=sys.stderr)
         exit(0)
     return
 
